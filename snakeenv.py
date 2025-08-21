@@ -22,8 +22,9 @@ class SnakeEnv(gym.Env):
     DOWN = np.array([0, 1])
 
     EMPTY_CELL = 0
-    FOOD_CELL = 2
-    SNAKE_CELL = 1
+    FOOD_CELL = 1
+    SNAKE_CELL = 2
+    SNAKE_HEAD_CELL = 3 # only used in the observation
 
     INFO = {}
 
@@ -47,9 +48,7 @@ class SnakeEnv(gym.Env):
 
         self.observation_space = gym.spaces.Dict(
             {
-                "head_x": gym.spaces.Discrete(size_x),
-                "head_y": gym.spaces.Discrete(size_y),
-                "grid": gym.spaces.Box(0, 2, shape=(size_x, size_y), dtype=np.int_),
+                "grid": gym.spaces.Box(0, 3, shape=(size_x, size_y), dtype=np.int_),
                 "is_full": gym.spaces.Discrete(2),
             }
         )
@@ -61,10 +60,10 @@ class SnakeEnv(gym.Env):
 
     def _get_observation(self):
         head = self._get_head()
+        grid = self._grid.copy()
+        grid[tuple(head)] = self.SNAKE_HEAD_CELL
         return {
-            "head_x": head[0],
-            "head_y": head[1],
-            "grid": self._grid.copy(),
+            "grid": grid,
             "is_full": self._is_full(),
         }
 
@@ -104,18 +103,21 @@ class SnakeEnv(gym.Env):
         reward = 0
         next_head = self._get_head() + self._direction
 
+        remaining_food = self._size_x * self._size_y - self._get_snake_length()
+
         if next_head[0] < 0 or next_head[0] >= self._size_x or next_head[1] < 0 or next_head[1] >= self._size_y:
             terminated = True
-            reward -= 100
+            reward -= remaining_food * 100
         elif self._grid[tuple(next_head)] == self.SNAKE_CELL:
             terminated = True
-            reward -= 100
+            reward -= remaining_food * 100
         elif self._grid[tuple(next_head)] == self.FOOD_CELL:
             self._snake_queue.append(next_head)
             self._grid[tuple(next_head)] = self.SNAKE_CELL
             self._position_food()
             reward += 100
             if self._is_full():
+                reward += 1000000
                 terminated = True
         else:
             tail = self._snake_queue.popleft()
