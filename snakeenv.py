@@ -38,6 +38,8 @@ class SnakeEnv(gym.Env):
         self._snake_queue = deque()
         self._direction = np.array([0, 0], dtype=np.int_)
 
+        self.steps_since_last_food = 0
+
         self.action_space = gym.spaces.Discrete(4)
         self._action_to_direction = {
             Actions.LEFT.value: self.LEFT,
@@ -105,7 +107,10 @@ class SnakeEnv(gym.Env):
 
         remaining_food = self._size_x * self._size_y - self._get_snake_length()
 
-        if next_head[0] < 0 or next_head[0] >= self._size_x or next_head[1] < 0 or next_head[1] >= self._size_y:
+        if self.steps_since_last_food >= 2 * remaining_food:
+            truncated = True
+            reward -= remaining_food * 100
+        elif next_head[0] < 0 or next_head[0] >= self._size_x or next_head[1] < 0 or next_head[1] >= self._size_y:
             terminated = True
             reward -= remaining_food * 100
         elif self._grid[tuple(next_head)] == self.SNAKE_CELL:
@@ -124,6 +129,8 @@ class SnakeEnv(gym.Env):
             self._grid[tuple(tail)] = self.EMPTY_CELL
             self._snake_queue.append(next_head)
             self._grid[tuple(next_head)] = self.SNAKE_CELL
+
+        self.steps_since_last_food += 1
 
         self._render_human_if_needed()
 
@@ -144,6 +151,8 @@ class SnakeEnv(gym.Env):
                         self._grid[x, y] = self.FOOD_CELL
                         return
                     food_remaining_index -= 1
+
+        self.steps_since_last_food = 0
 
     def render(self):
         if self.render_mode == "ansi":
