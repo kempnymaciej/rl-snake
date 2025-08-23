@@ -13,15 +13,15 @@ from collections import deque
 
 GAMMA = 0.99
 EPSILON_START = 1.0
-EPSILON_END = 0.01
+EPSILON_END = 0.05
 EPSILON_DECAY = 2500
 LEARNING_RATE = 0.0003
 TARGET_NET_UPDATE_RATE = 0.005
-BATCH_SIZE = 128
-NUM_EPISODES = 50000
+BATCH_SIZE = 512
 REPLAY_MEMORY_SIZE = 10000
+NUM_EPISODES = 5000
 
-env = FlattenObservation(SnakeEnv(render_mode=None, size_x=10, size_y=10))
+env = FlattenObservation(SnakeEnv(render_mode=None, size_x=5, size_y=5))
 device = torch.device(
     "cuda" if torch.cuda.is_available() else
     "mps" if torch.backends.mps.is_available() else
@@ -98,21 +98,21 @@ def optimize_model():
 
     optimizer.zero_grad()
     loss.backward()
-    # torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
+    torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
     optimizer.step()
 
     if steps_done % 500 == 0:
         print(f"Loss: {loss.item()}")
 
-
+steps_in_episode_batch = 0
 for episode in tqdm(range(NUM_EPISODES)):
     observation, info = env.reset()
     observation = process_observation(observation)
     done = False
-
     while not done:
         action = get_action(observation)
         next_observation, reward, terminated, truncated, info = env.step(action)
+        steps_in_episode_batch += 1
         done = terminated or truncated
         next_observation = process_observation(next_observation)
 
@@ -138,12 +138,16 @@ for episode in tqdm(range(NUM_EPISODES)):
         target_net.load_state_dict(target_net_state_dict)
 
         steps_done += 1
-        eps_threshold = EPSILON_END + (EPSILON_START - EPSILON_END) * \
-                        math.exp(-1. * steps_done / EPSILON_DECAY)
+        epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * \
+                  math.exp(-1. * steps_done / EPSILON_DECAY)
+
+    if episode % 100 == 0:
+        print(f"Episode: {episode} Average steps in episode: {steps_in_episode_batch / 100}")
+        steps_in_episode_batch = 0
 
 env.close()
 
-torch.save(policy_net.state_dict(), "model.pth")
+torch.save(target_net.state_dict(), "model.pth")
 # env = FlattenObservation(SnakeEnv(render_mode="human", size_x=10, size_y=10))
 # observation, info = env.reset()
 # done = False

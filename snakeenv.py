@@ -103,27 +103,28 @@ class SnakeEnv(gym.Env):
 
         if self.steps_since_last_food >= 2 * remaining_food:
             truncated = True
-            reward -= remaining_food * 100
+            reward -= 1
         elif next_head[0] < 0 or next_head[0] >= self._size_x or next_head[1] < 0 or next_head[1] >= self._size_y:
             terminated = True
-            reward -= remaining_food * 100
+            reward -= 1
         elif self._grid[tuple(next_head)] == self.SNAKE_CELL:
             terminated = True
-            reward -= remaining_food * 100
+            reward -= 1
         elif self._grid[tuple(next_head)] == self.FOOD_CELL:
             self._snake_queue.append(next_head)
             self._grid[tuple(next_head)] = self.SNAKE_CELL
             self._position_food()
-            reward += 100
+            reward += 1
             if self._is_full():
-                reward += 1000000
+                reward += 1
                 terminated = True
         else:
-            food_delta = self.food_position - next_head
-            if np.dot(food_delta, self._direction) > 0:
-                reward += 1
+            initial_food_delta = np.sum(np.abs(self.food_position - initial_head))
+            next_food_delta = np.sum(np.abs(self.food_position - next_head))
+            if initial_food_delta > next_food_delta:
+                reward += 0.01
             else:
-                reward -= 1
+                reward -= self.steps_since_last_food * 0.001
 
             tail = self._snake_queue.popleft()
             self._grid[tuple(tail)] = self.EMPTY_CELL
@@ -137,8 +138,9 @@ class SnakeEnv(gym.Env):
         return self._get_observation(), reward, terminated, truncated, self.INFO
 
     def _position_food(self):
-        empty_cells_count = self._size_x * self._size_y - self._get_snake_length()
+        self.steps_since_last_food = 0
 
+        empty_cells_count = self._size_x * self._size_y - self._get_snake_length()
         if empty_cells_count <= 0:
             return
 
@@ -152,8 +154,6 @@ class SnakeEnv(gym.Env):
                         self.food_position = np.array([x, y])
                         return
                     food_remaining_index -= 1
-
-        self.steps_since_last_food = 0
 
     def render(self):
         if self.render_mode == "ansi":

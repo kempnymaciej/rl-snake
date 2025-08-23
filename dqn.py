@@ -6,8 +6,8 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
 
         self.layer1 = nn.Linear(num_observations, 128)
-        self.layer2 = nn.Linear(128, 128)
-        self.layer3 = nn.Linear(128, num_actions)
+        self.layer2 = nn.Linear(128, 64)
+        self.layer3 = nn.Linear(64, num_actions)
 
     def forward(self, x):
         x = nn.functional.relu(self.layer1(x))

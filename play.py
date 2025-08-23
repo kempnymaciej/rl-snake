@@ -6,7 +6,7 @@ from gymnasium.wrappers import FlattenObservation
 from dqn import DQN
 from snakeenv import SnakeEnv
 
-env = FlattenObservation(SnakeEnv(render_mode="human", size_x=10, size_y=10))
+env = FlattenObservation(SnakeEnv(render_mode="human", size_x=5, size_y=5))
 n_actions = env.action_space.n
 observation, info = env.reset()
 n_observations = len(observation)
