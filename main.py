@@ -19,7 +19,7 @@ LEARNING_RATE = 0.0003
 TARGET_NET_UPDATE_RATE = 0.005
 BATCH_SIZE = 512
 REPLAY_MEMORY_SIZE = 10000
-NUM_EPISODES = 5000
+NUM_EPISODES = 8000
 
 env = FlattenObservation(SnakeEnv(render_mode=None, size_x=5, size_y=5))
 device = torch.device(

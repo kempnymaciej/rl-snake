@@ -22,9 +22,7 @@ class SnakeEnv(gym.Env):
     DOWN = np.array([0, 1])
 
     EMPTY_CELL = 0
-    FOOD_CELL = 1
-    SNAKE_CELL = 2
-    SNAKE_HEAD_CELL = 3 # only used in the observation
+    OCCUPIED_CELL = 1
 
     INFO = {}
 
@@ -34,12 +32,12 @@ class SnakeEnv(gym.Env):
         self.window_size_x = 512
         self.window_size_y = self.window_size_x * size_y // size_x
 
-        self._grid = np.zeros((size_x, size_y), dtype=np.int_)
+        self._collisions = np.zeros((size_x, size_y), dtype=np.bool_)
         self._snake_queue = deque()
         self._direction = np.array([0, 0], dtype=np.int_)
-
-        self.steps_since_last_food = 0
-        self.food_position = None
+        self._head_position = None
+        self._food_position = None
+        self._steps_since_last_food = 0
 
         self.action_space = gym.spaces.Discrete(4)
         self._action_to_direction = {
@@ -49,7 +47,15 @@ class SnakeEnv(gym.Env):
             Actions.DOWN.value: self.DOWN
         }
 
-        self.observation_space = gym.spaces.Box(0, 3, shape=(size_x, size_y), dtype=np.int_)
+        self.observation_space = gym.spaces.Dict(
+            {
+                "collisions": gym.spaces.Box(low=0, high=1, shape=(size_x, size_y), dtype=np.int_),
+                "head_position_x": gym.spaces.Box(low=0, high=size_x - 1, shape=(2,), dtype=np.int_),
+                "head_position_y": gym.spaces.Box(low=0, high=size_y - 1, shape=(2,), dtype=np.int_),
+                "food_position_x": gym.spaces.Box(low=0, high=size_x - 1, shape=(2,), dtype=np.int_),
+                "food_position_y": gym.spaces.Box(low=0, high=size_y - 1, shape=(2,), dtype=np.int_),
+            }
+        )
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -57,16 +63,16 @@ class SnakeEnv(gym.Env):
         self.clock = None
 
     def _get_observation(self):
-        head = self._get_head()
-        grid = self._grid.copy()
-        grid[tuple(head)] = self.SNAKE_HEAD_CELL
-        return grid
+        return {
+            "collisions": self._collisions.copy(),
+            "head_position_x": self._head_position[0],
+            "head_position_y": self._head_position[1],
+            "food_position_x": self._food_position[0],
+            "food_position_y": self._food_position[1],
+        }
 
     def _is_full(self):
         return self._get_snake_length() == self._size_x * self._size_y
-
-    def _get_head(self):
-        return self._snake_queue[-1]
 
     def _get_snake_length(self):
         return len(self._snake_queue)
@@ -75,12 +81,11 @@ class SnakeEnv(gym.Env):
         super().reset(seed=seed)
 
         self._direction = self._action_to_direction[int(self.np_random.integers(0, 4))]
-        snake_head = np.array([self._size_x // 2, self._size_y // 2])
+        self._head_position = np.array([self._size_x // 2, self._size_y // 2])
         self._snake_queue = deque()
-        self._snake_queue.append(snake_head)
-        self._grid.fill(self.EMPTY_CELL)
-        self._grid[tuple(snake_head)] = self.SNAKE_CELL
-
+        self._snake_queue.append(self._head_position)
+        self._collisions.fill(self.EMPTY_CELL)
+        self._collisions[tuple(self._head_position)] = self.OCCUPIED_CELL
         self._position_food()
 
         self._render_human_if_needed()
@@ -88,70 +93,69 @@ class SnakeEnv(gym.Env):
         return self._get_observation(), self.INFO
 
     def step(self, action):
-        next_direction = self._action_to_direction[action]
-        if (self._direction[0] != 0 and next_direction[0] != 0) or (self._direction[1] != 0 and next_direction[1] != 0):
-            next_direction = self._direction
-        self._direction = next_direction
+        action_direction = self._action_to_direction[action]
+        if (self._direction[0] != 0 and action_direction[0] != 0) or (self._direction[1] != 0 and action_direction[1] != 0):
+            action_direction = self._direction
+        self._direction = action_direction
 
         terminated = False
         truncated = False
         reward = 0
-        initial_head = self._get_head()
-        next_head = initial_head + self._direction
+        next_head = self._head_position + self._direction
 
         remaining_food = self._size_x * self._size_y - self._get_snake_length()
 
-        if self.steps_since_last_food >= 2 * remaining_food:
+        if self._steps_since_last_food >= 10 * remaining_food:
             truncated = True
             reward -= 1
-        elif next_head[0] < 0 or next_head[0] >= self._size_x or next_head[1] < 0 or next_head[1] >= self._size_y:
+
+        if next_head[0] < 0 or next_head[0] >= self._size_x or next_head[1] < 0 or next_head[1] >= self._size_y:
             terminated = True
             reward -= 1
-        elif self._grid[tuple(next_head)] == self.SNAKE_CELL:
+        elif self._collisions[tuple(next_head)] == self.OCCUPIED_CELL:
             terminated = True
             reward -= 1
-        elif self._grid[tuple(next_head)] == self.FOOD_CELL:
+        elif np.array_equal(next_head, self._food_position):
+            self._head_position = next_head
             self._snake_queue.append(next_head)
-            self._grid[tuple(next_head)] = self.SNAKE_CELL
+            self._collisions[tuple(next_head)] = self.OCCUPIED_CELL
             self._position_food()
-            reward += 1
+            reward += 0.5
             if self._is_full():
                 reward += 1
                 terminated = True
         else:
-            initial_food_delta = np.sum(np.abs(self.food_position - initial_head))
-            next_food_delta = np.sum(np.abs(self.food_position - next_head))
-            if initial_food_delta > next_food_delta:
-                reward += 0.01
-            else:
-                reward -= self.steps_since_last_food * 0.001
+            # initial_food_delta = np.sum(np.abs(self._food_position - self._head_position))
+            # next_food_delta = np.sum(np.abs(self._food_position - next_head))
+            # if initial_food_delta > next_food_delta:
+            #     reward += 0.01
+            # else:
+            #     reward -= self._steps_since_last_food * 0.001
 
             tail = self._snake_queue.popleft()
-            self._grid[tuple(tail)] = self.EMPTY_CELL
+            self._collisions[tuple(tail)] = self.EMPTY_CELL
+            self._head_position = next_head
             self._snake_queue.append(next_head)
-            self._grid[tuple(next_head)] = self.SNAKE_CELL
-
-        self.steps_since_last_food += 1
+            self._collisions[tuple(next_head)] = self.OCCUPIED_CELL
+            self._steps_since_last_food += 1
 
         self._render_human_if_needed()
 
         return self._get_observation(), reward, terminated, truncated, self.INFO
 
     def _position_food(self):
-        self.steps_since_last_food = 0
+        self._steps_since_last_food = 0
 
         empty_cells_count = self._size_x * self._size_y - self._get_snake_length()
         if empty_cells_count <= 0:
             return
 
         food_remaining_index = self.np_random.integers(0, empty_cells_count)
-
         for x in range(self._size_x):
             for y in range(self._size_y):
-                if self._grid[x, y] == self.EMPTY_CELL:
+                if self._collisions[x, y] == self.EMPTY_CELL:
                     if food_remaining_index == 0:
-                        self._grid[x, y] = self.FOOD_CELL
-                        self.food_position = np.array([x, y])
+                        self._food_position = np.array([x, y])
                         return
                     food_remaining_index -= 1
 
@@ -168,13 +172,13 @@ class SnakeEnv(gym.Env):
         render_buffer = StringIO()
         for x in range(self._size_x):
             for y in range(self._size_y):
-                cell = self._grid[x, y]
-                if cell == self.EMPTY_CELL:
+                if self._collisions[x, y] == self.EMPTY_CELL:
                     render_buffer.write("#")
-                elif cell == self.FOOD_CELL:
-                    render_buffer.write("o")
-                elif cell == self.SNAKE_CELL:
-                    render_buffer.write("x")
+                else:
+                    if self._food_position[0] == x and self._food_position[1] == y:
+                        render_buffer.write("o")
+                    else:
+                        render_buffer.write("x")
             render_buffer.write("\n")
         return render_buffer.getvalue()
 
@@ -186,17 +190,7 @@ class SnakeEnv(gym.Env):
 
         for x in range(self._size_x):
             for y in range(self._size_y):
-                cell = self._grid[x, y]
-                if cell == self.FOOD_CELL:
-                    pygame.draw.rect(
-                        canvas,
-                        (0, 255, 0),
-                        pygame.Rect(
-                            (x * pixel_size, y * pixel_size),
-                            (pixel_size, pixel_size),
-                        ),
-                    )
-                elif cell == self.SNAKE_CELL:
+                if self._collisions[x, y] == self.OCCUPIED_CELL:
                     pygame.draw.rect(
                         canvas,
                         (255, 0, 0),
@@ -205,6 +199,16 @@ class SnakeEnv(gym.Env):
                             (pixel_size, pixel_size),
                         ),
                     )
+
+        pygame.draw.rect(
+            canvas,
+            (0, 255, 0),
+            pygame.Rect(
+                (self._food_position[0] * pixel_size, self._food_position[1] * pixel_size),
+                (pixel_size, pixel_size),
+            ),
+        )
+
         return canvas
 
     def _render_human_if_needed(self):
