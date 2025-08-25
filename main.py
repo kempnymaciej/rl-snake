@@ -10,8 +10,8 @@ import random
 
 from collections import deque
 
-NUM_EPISODES = 3000
-GAMMA = 0.95 # 0.98
+NUM_EPISODES = 10000
+GAMMA = 0.95
 EPSILON_START = 1.0
 EPSILON_END = 0.05
 EPSILON_END_EPISODE = int(0.8 * NUM_EPISODES)

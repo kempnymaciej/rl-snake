@@ -7,10 +7,9 @@ from collections import deque
 from io import StringIO
 
 class Actions(Enum):
-    LEFT = 0
-    RIGHT = 1
-    UP = 2
-    DOWN = 3
+    NONE = 0
+    TURN_LEFT = 1
+    TURN_RIGHT = 1
 
 class SnakeEnv(gym.Env):
 
@@ -39,14 +38,7 @@ class SnakeEnv(gym.Env):
         self._food_position = None
         self._steps_since_last_food = 0
 
-        self.action_space = gym.spaces.Discrete(4)
-        self._action_to_direction = {
-            Actions.LEFT.value: self.LEFT,
-            Actions.RIGHT.value: self.RIGHT,
-            Actions.UP.value: self.UP,
-            Actions.DOWN.value: self.DOWN
-        }
-
+        self.action_space = gym.spaces.Discrete(n=3)
         self.observation_space = gym.spaces.Dict(
             {
                 "collisions": gym.spaces.Box(low=0, high=1, shape=(size_x, size_y), dtype=np.int_),
@@ -54,6 +46,8 @@ class SnakeEnv(gym.Env):
                 "head_position_y": gym.spaces.Box(low=0, high=size_y - 1, shape=(2,), dtype=np.int_),
                 "food_position_x": gym.spaces.Box(low=0, high=size_x - 1, shape=(2,), dtype=np.int_),
                 "food_position_y": gym.spaces.Box(low=0, high=size_y - 1, shape=(2,), dtype=np.int_),
+                "direction_x": gym.spaces.Box(low=-1, high=1, shape=(2,), dtype=np.int_),
+                "direction_y": gym.spaces.Box(low=-1, high=1, shape=(2,), dtype=np.int_),
             }
         )
 
@@ -69,6 +63,8 @@ class SnakeEnv(gym.Env):
             "head_position_y": self._head_position[1],
             "food_position_x": self._food_position[0],
             "food_position_y": self._food_position[1],
+            "direction_x": self._direction[0],
+            "direction_y": self._direction[1],
         }
 
     def _is_full(self):
@@ -80,7 +76,7 @@ class SnakeEnv(gym.Env):
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
 
-        self._direction = self._action_to_direction[int(self.np_random.integers(0, 4))]
+        self._direction = self.RIGHT
         self._head_position = np.array([self._size_x // 2, self._size_y // 2])
         self._snake_queue = deque()
         self._snake_queue.append(self._head_position)
@@ -93,10 +89,11 @@ class SnakeEnv(gym.Env):
         return self._get_observation(), self.INFO
 
     def step(self, action):
-        action_direction = self._action_to_direction[action]
-        if (self._direction[0] != 0 and action_direction[0] != 0) or (self._direction[1] != 0 and action_direction[1] != 0):
-            action_direction = self._direction
-        self._direction = action_direction
+        if action != Actions.NONE.value:
+            if action == Actions.TURN_LEFT.value:
+                self._turn(-1)
+            elif action == Actions.TURN_RIGHT.value:
+                self._turn(1)
 
         terminated = False
         truncated = False
@@ -123,13 +120,6 @@ class SnakeEnv(gym.Env):
                 reward += 1
                 terminated = True
         else:
-            # initial_food_delta = np.sum(np.abs(self._food_position - self._head_position))
-            # next_food_delta = np.sum(np.abs(self._food_position - next_head))
-            # if initial_food_delta > next_food_delta:
-            #     reward += 0.01
-            # else:
-            #     reward -= self._steps_since_last_food * 0.001
-
             tail = self._snake_queue.popleft()
             self._collisions[tuple(tail)] = self.EMPTY_CELL
             self._head_position = next_head
@@ -157,6 +147,13 @@ class SnakeEnv(gym.Env):
                         return
                     food_remaining_index -= 1
 
+    def _turn(self, direction):
+        if self._direction[0] == 0:
+            self._direction[0] = direction * self._direction[1]
+            self._direction[1] = 0
+        else:
+            self._direction[1] = direction * -1 * self._direction[0]
+            self._direction[0] = 0
     def render(self):
         if self.render_mode == "ansi":
             return self._get_ascii_render()
