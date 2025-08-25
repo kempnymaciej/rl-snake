@@ -56,23 +56,6 @@ class SnakeEnv(gym.Env):
         self.window = None
         self.clock = None
 
-    def _get_observation(self):
-        return {
-            "collisions": self._collisions.copy(),
-            "head_position_x": self._head_position[0],
-            "head_position_y": self._head_position[1],
-            "food_position_x": self._food_position[0],
-            "food_position_y": self._food_position[1],
-            "direction_x": self._direction[0],
-            "direction_y": self._direction[1],
-        }
-
-    def _is_full(self):
-        return self._get_snake_length() == self._size_x * self._size_y
-
-    def _get_snake_length(self):
-        return len(self._snake_queue)
-
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
 
@@ -131,6 +114,38 @@ class SnakeEnv(gym.Env):
 
         return self._get_observation(), reward, terminated, truncated, self.INFO
 
+    def render(self):
+        if self.render_mode == "ansi":
+            return self._get_ascii_render()
+        elif self.render_mode == "rgb_array":
+            return np.transpose(
+                np.array(pygame.surfarray.pixels3d(self._get_canvas_render())), axes=(1, 0, 2)
+            )
+        return None
+
+    def close(self):
+        if self.window is not None:
+            pygame.display.quit()
+            pygame.quit()
+            self.window = None
+
+    def _get_observation(self):
+        return {
+            "collisions": self._collisions.copy(),
+            "head_position_x": self._head_position[0],
+            "head_position_y": self._head_position[1],
+            "food_position_x": self._food_position[0],
+            "food_position_y": self._food_position[1],
+            "direction_x": self._direction[0],
+            "direction_y": self._direction[1],
+        }
+
+    def _is_full(self):
+        return self._get_snake_length() == self._size_x * self._size_y
+
+    def _get_snake_length(self):
+        return len(self._snake_queue)
+
     def _position_food(self):
         self._steps_since_last_food = 0
 
@@ -154,14 +169,6 @@ class SnakeEnv(gym.Env):
         else:
             self._direction[1] = direction * -1 * self._direction[0]
             self._direction[0] = 0
-    def render(self):
-        if self.render_mode == "ansi":
-            return self._get_ascii_render()
-        elif self.render_mode == "rgb_array":
-            return np.transpose(
-                np.array(pygame.surfarray.pixels3d(self._get_canvas_render())), axes=(1, 0, 2)
-            )
-        return None
 
     def _get_ascii_render(self):
         render_buffer = StringIO()
@@ -226,9 +233,3 @@ class SnakeEnv(gym.Env):
         pygame.display.update()
 
         self.clock.tick(self.metadata["render_fps"])
-
-    def close(self):
-        if self.window is not None:
-            pygame.display.quit()
-            pygame.quit()
-            self.window = None
