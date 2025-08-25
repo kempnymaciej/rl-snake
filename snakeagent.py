@@ -92,9 +92,8 @@ class SnakeAgent:
                 steps_in_episode_batch += 1
                 rewards_in_episode_batch += reward
 
-
             if episode % 100 == 0:
-                print(f"Episode: {episode} Average steps: {steps_in_episode_batch / 100} Average reward: {rewards_in_episode_batch / 100}")
+                print(f"Episode: {episode} || Average steps: {steps_in_episode_batch / 100} || Average reward: {rewards_in_episode_batch / 100}")
                 steps_in_episode_batch = 0
                 rewards_in_episode_batch = 0
 
@@ -170,7 +169,8 @@ class SnakeAgent:
         observations = torch.stack(batch[0])  # shape: (B, 1, n_obs)
         observations = observations.squeeze(1)  # shape: (B, n_obs)
 
-        next_observations = torch.stack(batch[4]).squeeze(1)  # shape: (B, n_obs)
+        next_observations = torch.stack(batch[4])  # shape: (B, 1, n_obs)
+        next_observations = next_observations.squeeze(1)  # shape: (B, n_obs)
 
         # actions stored as scalars; make shape (B, 1)
         actions = torch.tensor(batch[1], dtype=torch.long, device=self.device).unsqueeze(1)  # (B,1)

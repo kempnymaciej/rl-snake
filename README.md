@@ -4,7 +4,7 @@ Different branches may contain different approaches, experiments, or ideas for s
 
 ## Features
 ### Custom Snake Environment
-- Built as a **Gymnasium environment**
+- Built as a **Gymnasium environment** (OpenAI)
 - **Reward structure:**
   - `+1` for eating food 
   - `-1` for dying
@@ -19,12 +19,12 @@ Different branches may contain different approaches, experiments, or ideas for s
   - Snake direction (x, y)
 
 ### Learning Agent
-- **DQN-based agent**
+- **DQN-based**
 - Enhancements:
   - Memory replay 
   - Soft update of the target network
 - The agent can:
-  - Learn to play autonomously 
+  - Learn to play 
   - Play in real time after training 
 
 ## Technology used

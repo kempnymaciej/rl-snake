@@ -9,7 +9,7 @@ from io import StringIO
 class Actions(Enum):
     NONE = 0
     TURN_LEFT = 1
-    TURN_RIGHT = 1
+    TURN_RIGHT = 2
 
 class SnakeEnv(gym.Env):
 
@@ -23,17 +23,16 @@ class SnakeEnv(gym.Env):
     EMPTY_CELL = 0
     OCCUPIED_CELL = 1
 
-    INFO = {}
-
     def __init__(self, render_mode=None, size_x=5, size_y=5):
+        self._info = {}
         self._size_x = size_x
         self._size_y = size_y
         self.window_size_x = 512
         self.window_size_y = self.window_size_x * size_y // size_x
 
         self._collisions = np.zeros((size_x, size_y), dtype=np.bool_)
-        self._snake_queue = deque()
-        self._direction = np.array([0, 0], dtype=np.int_)
+        self._snake_queue = None
+        self._direction = None
         self._head_position = None
         self._food_position = None
         self._steps_since_last_food = 0
@@ -69,7 +68,7 @@ class SnakeEnv(gym.Env):
 
         self._render_human_if_needed()
 
-        return self._get_observation(), self.INFO
+        return self._get_observation(), self._info
 
     def step(self, action):
         if action != Actions.NONE.value:
@@ -112,7 +111,7 @@ class SnakeEnv(gym.Env):
 
         self._render_human_if_needed()
 
-        return self._get_observation(), reward, terminated, truncated, self.INFO
+        return self._get_observation(), reward, terminated, truncated, self._info
 
     def render(self):
         if self.render_mode == "ansi":
