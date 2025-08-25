@@ -103,9 +103,7 @@ class SnakeEnv(gym.Env):
         reward = 0
         next_head = self._head_position + self._direction
 
-        remaining_food = self._size_x * self._size_y - self._get_snake_length()
-
-        if self._steps_since_last_food >= 10 * remaining_food:
+        if self._steps_since_last_food >= 5 * self._size_x * self._size_y:
             truncated = True
             reward -= 1
 
@@ -120,7 +118,7 @@ class SnakeEnv(gym.Env):
             self._snake_queue.append(next_head)
             self._collisions[tuple(next_head)] = self.OCCUPIED_CELL
             self._position_food()
-            reward += 0.5
+            reward += 1
             if self._is_full():
                 reward += 1
                 terminated = True

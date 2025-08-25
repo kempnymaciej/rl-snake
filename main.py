@@ -6,20 +6,19 @@ from snakeenv import SnakeEnv
 from tqdm import tqdm
 import torch.nn as nn
 import torch
-import math
 import random
 
 from collections import deque
 
-GAMMA = 0.99
+NUM_EPISODES = 3000
+GAMMA = 0.95 # 0.98
 EPSILON_START = 1.0
 EPSILON_END = 0.05
-EPSILON_DECAY = 2500
+EPSILON_END_EPISODE = int(0.8 * NUM_EPISODES)
 LEARNING_RATE = 0.0003
 TARGET_NET_UPDATE_RATE = 0.005
 BATCH_SIZE = 512
 REPLAY_MEMORY_SIZE = 10000
-NUM_EPISODES = 8000
 
 env = FlattenObservation(SnakeEnv(render_mode=None, size_x=5, size_y=5))
 device = torch.device(
@@ -51,9 +50,10 @@ optimizer = torch.optim.Adam(policy_net.parameters(), lr=LEARNING_RATE)
 reply_memory = deque([], maxlen=REPLAY_MEMORY_SIZE)
 
 steps_done = 0
-epsilon = EPSILON_START
+episodes_done = 0
 
 def get_action(observation, exploit_only=False):
+    epsilon = EPSILON_START - (episodes_done / EPSILON_END_EPISODE) * (EPSILON_START - EPSILON_END)
     if (not exploit_only) and (random.random() < epsilon):
         return env.action_space.sample()
     else:
@@ -138,9 +138,8 @@ for episode in tqdm(range(NUM_EPISODES)):
         target_net.load_state_dict(target_net_state_dict)
 
         steps_done += 1
-        epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * \
-                  math.exp(-1. * steps_done / EPSILON_DECAY)
 
+    episodes_done += 1
     if episode % 100 == 0:
         print(f"Episode: {episode} Average steps in episode: {steps_in_episode_batch / 100}")
         steps_in_episode_batch = 0
