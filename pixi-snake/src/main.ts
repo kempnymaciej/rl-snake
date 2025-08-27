@@ -1,6 +1,7 @@
 import {Application, Point} from "pixi.js";
 import {SnakeView} from "./snake-view.ts";
-import {Snake, SnakeAction} from "./snake.ts";
+import {Snake} from "./snake.ts";
+import {SnakeNet} from "./snake-net.ts";
 
 (async () => {
     // Create a new application
@@ -12,24 +13,26 @@ import {Snake, SnakeAction} from "./snake.ts";
     // Append the application canvas to the document body
     document.getElementById("pixi-container")!.appendChild(app.canvas);
 
+    const snakeNet = await SnakeNet.create();
     const gridSize = new Point(5, 5);
     const snake = new Snake(gridSize);
+    let observation = snake.reset();
     SnakeView.Initialize(app.stage, gridSize);
-    SnakeView.Draw(snake.reset().collisions, snake.reset().foodPosition);
+    SnakeView.Draw(observation.collisions, observation.foodPosition);
 
-    const stepMs = 500;
+    const stepMs = 200;
     let accumulatedTime = 0;
-    // Listen for animate update
-    app.ticker.add((time) => {
+
+    app.ticker.add(async (time) => {
         accumulatedTime += time.deltaMS;
 
         while (accumulatedTime >= stepMs) {
             accumulatedTime -= stepMs;
 
-            const action = Math.floor(Math.random() * 3) as SnakeAction;
+            const action = await snakeNet.predict(observation);
             const stepResult = snake.step(action);
 
-            let observation = stepResult.observation;
+            observation = stepResult.observation;
             if (stepResult.terminated)
             {
                 observation = snake.reset();
