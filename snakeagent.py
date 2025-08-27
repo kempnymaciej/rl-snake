@@ -120,6 +120,27 @@ class SnakeAgent:
             observation = next_observation
         env.close()
 
+    def export_onnx(self, in_model_path="model.pth", out_model_path="model.onnx"):
+        env = self._wrap_env(SnakeEnv(render_mode=None, size_x=self._game_size_x, size_y=self._game_size_y))
+        n_actions = env.action_space.n
+        observation, info = env.reset()
+        n_observations = len(observation)
+        net = DQN(n_observations, n_actions).to(self.device)
+        net.load_state_dict(torch.load(in_model_path))
+
+        observation = self._process_observation(observation)
+
+        torch.onnx.export(
+            net,
+            (observation,),
+            out_model_path,
+            export_params=True,
+            opset_version=11,
+            do_constant_folding=True,
+            input_names=['input'],
+            output_names=['output'],
+        )
+
     def _initialize_training(self):
         env = self._wrap_env(SnakeEnv(render_mode=None, size_x=self._game_size_x, size_y=self._game_size_y))
 
