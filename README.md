@@ -2,6 +2,9 @@
 This project is a learning and exploration exercise in applying reinforcement learning to the classic Snake game.
 Different branches may contain different approaches, experiments, or ideas for solving the problem - so expect some variety!
 
+### This Branch
+This branch is a proof-of-concept: it demonstrates that a model trained in PyTorch can be exported to ONNX and then successfully used inside a PixiJS project in the browser (via ONNX Runtime Web).
+
 ## Features
 ### Custom Snake Environment
 - Built as a **Gymnasium environment** (OpenAI)
